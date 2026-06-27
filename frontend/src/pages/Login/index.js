@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, useCallback } from "react";
 import { Link as RouterLink } from "react-router-dom";
 
 import Button from "@material-ui/core/Button";
@@ -12,10 +12,14 @@ import Fade from "@material-ui/core/Fade";
 import Paper from "@material-ui/core/Paper";
 import MenuList from "@material-ui/core/MenuList";
 import IconButton from "@material-ui/core/IconButton";
+import InputAdornment from "@material-ui/core/InputAdornment";
+import CircularProgress from "@material-ui/core/CircularProgress";
 import { makeStyles, useTheme } from "@material-ui/core/styles";
 import Brightness4Icon from "@material-ui/icons/Brightness4";
 import Brightness7Icon from "@material-ui/icons/Brightness7";
 import LanguageIcon from "@material-ui/icons/Translate";
+import VisibilityIcon from "@material-ui/icons/Visibility";
+import VisibilityOffIcon from "@material-ui/icons/VisibilityOff";
 import Typography from "@material-ui/core/Typography";
 
 import { i18n } from "../../translate/i18n";
@@ -30,21 +34,14 @@ import { loadJSON } from "../../helpers/loadJSON";
 const gitinfo = loadJSON("/gitinfo.json");
 
 const parseLoginLinks = value => {
-  if (!value) {
-    return [];
-  }
-
+  if (!value) return [];
   try {
     const parsedValue = JSON.parse(value);
-
-    if (!Array.isArray(parsedValue)) {
-      return [];
-    }
-
+    if (!Array.isArray(parsedValue)) return [];
     return parsedValue.filter(
       link => typeof link?.title === "string" && typeof link?.url === "string"
     );
-  } catch (error) {
+  } catch {
     return [];
   }
 };
@@ -52,10 +49,7 @@ const parseLoginLinks = value => {
 const isVideoFile = (filename = "") => /\.(mp4|webm|ogg)$/i.test(filename);
 
 const getPublicAssetUrl = filename => {
-  if (!filename) {
-    return "";
-  }
-
+  if (!filename) return "";
   return `${getBackendURL()}/public/${filename}`;
 };
 
@@ -70,10 +64,9 @@ const useStyles = makeStyles(theme => ({
   backgroundLayer: {
     position: "absolute",
     inset: 0,
-    background: `linear-gradient(to right, ${theme.palette.background.default}, ${theme.palette.background.default}, ${theme.palette.primary.main}, ${theme.palette.background.default}, ${theme.palette.background.default})`,
-    backgroundColor: theme.palette.background.default,
-    backgroundSize: "200% 200%",
-    animation: "$gradientDrift 18s ease-in-out infinite",
+    background: `linear-gradient(135deg, ${theme.palette.background.default} 0%, ${theme.palette.background.default} 25%, ${theme.palette.primary.main}55 50%, ${theme.palette.background.default} 75%, ${theme.palette.background.default} 100%)`,
+    backgroundSize: "300% 300%",
+    animation: "$gradientDrift 20s ease-in-out infinite",
     willChange: "background-position",
     "@media (prefers-reduced-motion: reduce)": {
       animation: "none"
@@ -86,6 +79,15 @@ const useStyles = makeStyles(theme => ({
     backgroundPosition: "center",
     animation: "none",
     willChange: "auto"
+  },
+  backgroundOverlay: {
+    position: "absolute",
+    inset: 0,
+    background:
+      theme.palette.type === "light"
+        ? "rgba(255,255,255,0.1)"
+        : "rgba(0,0,0,0.3)",
+    backdropFilter: "blur(2px)"
   },
   backgroundVideo: {
     position: "absolute",
@@ -107,67 +109,52 @@ const useStyles = makeStyles(theme => ({
       padding: theme.spacing(1.5)
     }
   },
-  themeToggle: {
+  topActions: {
     position: "absolute",
     top: theme.spacing(2),
     right: theme.spacing(2),
-    zIndex: 2,
-    color: theme.palette.type === "light" ? "#142033" : "#fff",
-    background:
-      theme.palette.type === "light"
-        ? "rgba(255,255,255,0.68)"
-        : "rgba(6,12,22,0.5)",
-    border:
-      theme.palette.type === "light"
-        ? "1px solid rgba(255,255,255,0.8)"
-        : "1px solid rgba(255,255,255,0.18)",
-    backdropFilter: "blur(12px)",
-    "&:hover": {
-      background:
-        theme.palette.type === "light"
-          ? "rgba(255,255,255,0.84)"
-          : "rgba(10,18,31,0.68)"
-    },
+    zIndex: 10,
+    display: "flex",
+    gap: theme.spacing(1),
     [theme.breakpoints.down("xs")]: {
       top: theme.spacing(1),
-      right: theme.spacing(1)
+      right: theme.spacing(1),
+      gap: theme.spacing(0.5)
     }
   },
-  languageToggle: {
-    position: "absolute",
-    top: theme.spacing(2),
-    right: theme.spacing(10),
-    zIndex: 2,
+  topActionBtn: {
     color: theme.palette.type === "light" ? "#142033" : "#fff",
     background:
       theme.palette.type === "light"
-        ? "rgba(255,255,255,0.68)"
-        : "rgba(6,12,22,0.5)",
+        ? "rgba(255,255,255,0.72)"
+        : "rgba(6,12,22,0.55)",
     border:
       theme.palette.type === "light"
-        ? "1px solid rgba(255,255,255,0.8)"
-        : "1px solid rgba(255,255,255,0.18)",
-    backdropFilter: "blur(12px)",
+        ? "1px solid rgba(255,255,255,0.82)"
+        : "1px solid rgba(255,255,255,0.15)",
+    backdropFilter: "blur(16px)",
+    transition: "all 200ms ease",
     "&:hover": {
       background:
         theme.palette.type === "light"
-          ? "rgba(255,255,255,0.84)"
-          : "rgba(10,18,31,0.68)"
-    },
-    [theme.breakpoints.down("xs")]: {
-      top: theme.spacing(1),
-      right: theme.spacing(7)
+          ? "rgba(255,255,255,0.9)"
+          : "rgba(10,18,31,0.7)",
+      transform: "scale(1.05)"
     }
   },
   langMenu: {
-    zIndex: 3
+    zIndex: 20
   },
   langMenuPaper: {
     minWidth: 160,
-    borderRadius: theme.spacing(1),
+    borderRadius: 12,
     overflow: "hidden",
-    transformOrigin: "top center",
-    transition: "transform 180ms ease, opacity 180ms ease"
+    background:
+      theme.palette.type === "light"
+        ? "rgba(255,255,255,0.95)"
+        : "rgba(30,30,30,0.95)",
+    backdropFilter: "blur(20px)",
+    border: `1px solid ${theme.palette.backgroundContrast.border}`
   },
   layout: {
     width: "100%",
@@ -175,9 +162,9 @@ const useStyles = makeStyles(theme => ({
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: theme.spacing(2),
+    gap: theme.spacing(2.5),
     [theme.breakpoints.down("sm")]: {
-      maxWidth: 440
+      maxWidth: 420
     }
   },
   loginBox: {
@@ -190,12 +177,17 @@ const useStyles = makeStyles(theme => ({
     backgroundColor: theme.palette.background.paper,
     boxShadow:
       theme.palette.type === "light"
-        ? "0 24px 72px rgba(45, 67, 89, 0.18)"
-        : "0 24px 80px rgba(0,0,0,0.35)",
+        ? "0 32px 80px rgba(0,0,0,0.10), 0 8px 32px rgba(0,0,0,0.06)"
+        : "0 32px 80px rgba(0,0,0,0.4), 0 8px 32px rgba(0,0,0,0.2)",
     border: `1px solid ${theme.palette.backgroundContrast.border}`,
+    animation: "$cardEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
     [theme.breakpoints.down("sm")]: {
       display: "block",
-      maxWidth: 420
+      maxWidth: 420,
+      borderRadius: 24
+    },
+    [theme.breakpoints.down("xs")]: {
+      borderRadius: 20
     }
   },
   mediaPane: {
@@ -232,36 +224,105 @@ const useStyles = makeStyles(theme => ({
   },
   paper: {
     width: "100%",
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: "transparent",
     color: theme.palette.text.primary,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    padding: "32px 32px 28px",
+    padding: "36px 36px 32px",
     minHeight: 0,
     borderRadius: 0,
     boxShadow: "none",
     border: "none",
     [theme.breakpoints.down("xs")]: {
-      padding: "24px 16px 20px",
-      borderRadius: 16
+      padding: "28px 20px 24px"
     },
     [theme.breakpoints.down("sm")]: {
-      borderRadius: 24
+      padding: "32px 28px 28px"
     }
   },
-  form: {
-    width: "100%",
-    marginTop: theme.spacing(1)
-  },
-  submit: {
-    margin: theme.spacing(2, 0, 1)
+  logoWrap: {
+    marginBottom: theme.spacing(1)
   },
   logoImg: {
     width: "100%",
-    maxWidth: 200,
-    margin: "0 auto 8px",
+    maxWidth: 180,
+    margin: "0 auto",
+    display: "block",
     content: `url("${theme.calculatedLogo()}")`
+  },
+  welcomeText: {
+    fontSize: "1.25rem",
+    fontWeight: 700,
+    color: theme.palette.text.primary,
+    marginBottom: theme.spacing(0.5)
+  },
+  form: {
+    width: "100%",
+    marginTop: theme.spacing(2)
+  },
+  inputField: {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: 12,
+      backgroundColor:
+        theme.palette.type === "light"
+          ? "rgba(0,0,0,0.02)"
+          : "rgba(255,255,255,0.04)",
+      transition: "background-color 200ms ease, box-shadow 200ms ease",
+      "&:hover": {
+        backgroundColor:
+          theme.palette.type === "light"
+            ? "rgba(0,0,0,0.04)"
+            : "rgba(255,255,255,0.06)"
+      },
+      "&.Mui-focused": {
+        backgroundColor: "transparent",
+        boxShadow: `0 0 0 3px ${theme.palette.primary.main}22`
+      },
+      "& fieldset": {
+        borderWidth: 1.5,
+        borderColor:
+          theme.palette.type === "light"
+            ? "rgba(0,0,0,0.12)"
+            : "rgba(255,255,255,0.15)"
+      },
+      "&.Mui-focused fieldset": {
+        borderColor: theme.palette.primary.main,
+        borderWidth: 1.5
+      }
+    },
+    "& .MuiInputBase-input": {
+      paddingTop: 16,
+      paddingBottom: 16
+    },
+    "& .MuiInputLabel-outlined": {
+      transform: "translate(14px, 18px) scale(1)",
+      "&.MuiInputLabel-shrink": {
+        transform: "translate(14px, -6px) scale(0.75)"
+      }
+    }
+  },
+  submitBtn: {
+    margin: theme.spacing(2.5, 0, 0.5),
+    padding: "12px 0",
+    borderRadius: 12,
+    fontSize: "0.95rem",
+    fontWeight: 700,
+    letterSpacing: 0.3,
+    textTransform: "none",
+    boxShadow: `0 8px 24px ${theme.palette.primary.main}33`,
+    transition: "all 250ms ease",
+    "&:hover": {
+      boxShadow: `0 12px 32px ${theme.palette.primary.main}55`,
+      transform: "translateY(-1px)"
+    },
+    "&.Mui-disabled": {
+      boxShadow: "none"
+    }
+  },
+  signupRow: {
+    marginTop: theme.spacing(1),
+    justifyContent: "center"
   },
   linksContainer: {
     width: "100%",
@@ -279,7 +340,7 @@ const useStyles = makeStyles(theme => ({
     alignItems: "center",
     justifyContent: "center",
     minHeight: 40,
-    padding: theme.spacing(1, 2),
+    padding: theme.spacing(1, 2.5),
     borderRadius: 999,
     textDecoration: "none",
     color: theme.palette.type === "light" ? "#142033" : "#fff",
@@ -298,16 +359,20 @@ const useStyles = makeStyles(theme => ({
         : "1px solid rgba(255,255,255,0.18)",
     boxShadow:
       theme.palette.type === "light"
-        ? "0 12px 28px rgba(45, 67, 89, 0.12)"
+        ? "0 12px 28px rgba(45, 67, 89, 0.10)"
         : "none",
     backdropFilter: "blur(14px)",
-    transition: "transform 160ms ease, background-color 160ms ease",
+    transition: "all 200ms ease",
     "&:hover": {
-      transform: "translateY(-1px)",
+      transform: "translateY(-2px)",
       background:
         theme.palette.type === "light"
           ? "rgba(255,255,255,0.9)"
           : "rgba(10,18,31,0.78)",
+      boxShadow:
+        theme.palette.type === "light"
+          ? "0 16px 36px rgba(45, 67, 89, 0.14)"
+          : "none",
       textDecoration: "none"
     }
   },
@@ -316,29 +381,36 @@ const useStyles = makeStyles(theme => ({
     right: theme.spacing(2),
     bottom: theme.spacing(1.25),
     zIndex: 2,
-    fontSize: "12px",
-    fontWeight: "bold",
+    fontSize: "11px",
+    fontWeight: 700,
+    letterSpacing: 0.5,
     textAlign: "right",
     color: theme.palette.type === "light" ? "#0e1726" : "#ffffff",
     textShadow:
       theme.palette.type === "light"
-        ? "1px 0 2px rgba(255,255,255,0.9), -1px 0 2px rgba(255,255,255,0.9), 0 1px 2px rgba(255,255,255,0.9), 0 -1px 2px rgba(255,255,255,0.9), 0 2px 6px rgba(0,0,0,0.35)"
-        : "1px 0 2px rgba(0,0,0,0.9), -1px 0 2px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.9), 0 -1px 2px rgba(0,0,0,0.9), 0 2px 6px rgba(0,0,0,0.65)",
+        ? "0 1px 3px rgba(255,255,255,0.9), 0 0 8px rgba(255,255,255,0.6)"
+        : "0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6)",
     [theme.breakpoints.down("xs")]: {
       right: theme.spacing(1),
       bottom: theme.spacing(0.75),
-      fontSize: "11px"
+      fontSize: "10px"
     }
   },
   "@keyframes gradientDrift": {
-    "0%": {
-      backgroundPosition: "0% 50%"
+    "0%": { backgroundPosition: "0% 50%" },
+    "25%": { backgroundPosition: "100% 0%" },
+    "50%": { backgroundPosition: "100% 100%" },
+    "75%": { backgroundPosition: "0% 100%" },
+    "100%": { backgroundPosition: "0% 50%" }
+  },
+  "@keyframes cardEntrance": {
+    from: {
+      opacity: 0,
+      transform: "translateY(20px) scale(0.97)"
     },
-    "50%": {
-      backgroundPosition: "100% 50%"
-    },
-    "100%": {
-      backgroundPosition: "0% 50%"
+    to: {
+      opacity: 1,
+      transform: "translateY(0) scale(1)"
     }
   }
 }));
@@ -353,13 +425,15 @@ const Login = () => {
   const currentLanguage =
     localStorage.getItem("language") || i18n.language || "en";
 
-  const handleChooseLanguage = lang => {
+  const handleChooseLanguage = useCallback(lang => {
     setLangMenuAnchor(null);
     localStorage.setItem("language", lang);
     window.location.reload(false);
-  };
+  }, []);
 
   const [user, setUser] = useState({ email: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [allowSignup, setAllowSignup] = useState(false);
   const [loginLinks, setLoginLinks] = useState([]);
   const [sidePanelImage, setSidePanelImage] = useState("");
@@ -367,17 +441,25 @@ const Login = () => {
 
   const { handleLogin } = useContext(AuthContext);
 
-  const handleChangeInput = event => {
-    setUser(prevUser => ({
-      ...prevUser,
-      [event.target.name]: event.target.value.trim()
-    }));
-  };
+  const handleChangeInput = useCallback(event => {
+    setUser(prev => ({ ...prev, [event.target.name]: event.target.value.trim() }));
+  }, []);
 
-  const handlSubmit = event => {
-    event.preventDefault();
-    handleLogin(user);
-  };
+  const handlSubmit = useCallback(
+    async event => {
+      event.preventDefault();
+      if (isSubmitting) return;
+      setIsSubmitting(true);
+      try {
+        await handleLogin(user);
+      } catch {
+        // handled by AuthContext
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [handleLogin, user, isSubmitting]
+  );
 
   useEffect(() => {
     Promise.all([
@@ -402,8 +484,7 @@ const Login = () => {
       .catch(error => {
         console.log("Error reading setting", error);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [getPublicSetting]);
 
   const backgroundAssetUrl = getPublicAssetUrl(backgroundContent);
   const sidePanelImageUrl = getPublicAssetUrl(sidePanelImage);
@@ -414,13 +495,30 @@ const Login = () => {
   return (
     <div className={classes.root}>
       <CssBaseline />
-      <IconButton
-        className={classes.languageToggle}
-        onClick={event => setLangMenuAnchor(event.currentTarget)}
-        aria-label={i18n.t("mainDrawer.appBar.i18n.language")}
-      >
-        <LanguageIcon />
-      </IconButton>
+      <div className={classes.topActions}>
+        <IconButton
+          className={classes.topActionBtn}
+          onClick={event => setLangMenuAnchor(event.currentTarget)}
+          aria-label={i18n.t("mainDrawer.appBar.i18n.language")}
+          size="small"
+        >
+          <LanguageIcon fontSize="small" />
+        </IconButton>
+        <IconButton
+          className={classes.topActionBtn}
+          onClick={colorMode.toggleColorMode}
+          aria-label={
+            isLightMode ? "Switch to dark mode" : "Switch to light mode"
+          }
+          size="small"
+        >
+          {isLightMode ? (
+            <Brightness4Icon fontSize="small" />
+          ) : (
+            <Brightness7Icon fontSize="small" />
+          )}
+        </IconButton>
+      </div>
       <Popover
         className={classes.langMenu}
         open={Boolean(langMenuAnchor)}
@@ -440,7 +538,7 @@ const Login = () => {
         }}
         disableScrollLock
       >
-        <Paper className={classes.langMenuPaper} elevation={4}>
+        <Paper className={classes.langMenuPaper} elevation={8}>
           <MenuList>
             {Object.keys(messages).map(lang => (
               <MenuItem
@@ -448,7 +546,7 @@ const Login = () => {
                 onClick={() => handleChooseLanguage(lang)}
                 selected={currentLanguage === lang}
                 style={{
-                  fontWeight: currentLanguage === lang ? "bold" : "normal"
+                  fontWeight: currentLanguage === lang ? 700 : 400
                 }}
               >
                 {messages[lang].translations.mainDrawer.appBar.i18n.language}
@@ -457,25 +555,19 @@ const Login = () => {
           </MenuList>
         </Paper>
       </Popover>
-      <IconButton
-        className={classes.themeToggle}
-        onClick={colorMode.toggleColorMode}
-        aria-label={
-          isLightMode ? "Switch to dark mode" : "Switch to light mode"
-        }
-      >
-        {isLightMode ? <Brightness4Icon /> : <Brightness7Icon />}
-      </IconButton>
       {shouldRenderBackgroundVideo ? (
-        <video
-          className={classes.backgroundVideo}
-          autoPlay
-          loop
-          muted
-          playsInline
-        >
-          <source src={backgroundAssetUrl} />
-        </video>
+        <>
+          <video
+            className={classes.backgroundVideo}
+            autoPlay
+            loop
+            muted
+            playsInline
+          >
+            <source src={backgroundAssetUrl} />
+          </video>
+          <div className={classes.backgroundOverlay} />
+        </>
       ) : (
         <div
           className={`${classes.backgroundLayer}${backgroundAssetUrl ? ` ${classes.backgroundLayerImage}` : ""}`}
@@ -507,20 +599,24 @@ const Login = () => {
             <div className={classes.formColumn}>
               <div className={classes.formCardWrap}>
                 <div className={classes.paper}>
-                  <div>
+                  <div className={classes.logoWrap}>
                     <img
                       className={classes.logoImg}
                       alt={i18n.t("login.title")}
                     />
                   </div>
+                  <Typography className={classes.welcomeText} variant="h5">
+                    {i18n.t("login.title")}
+                  </Typography>
                   <form
                     className={classes.form}
                     noValidate
                     onSubmit={handlSubmit}
                   >
                     <TextField
+                      className={classes.inputField}
                       variant="outlined"
-                      margin="normal"
+                      margin="dense"
                       required
                       fullWidth
                       id="email"
@@ -532,29 +628,56 @@ const Login = () => {
                       autoFocus
                     />
                     <TextField
+                      className={classes.inputField}
                       variant="outlined"
-                      margin="normal"
+                      margin="dense"
                       required
                       fullWidth
                       name="password"
                       label={i18n.t("login.form.password")}
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       id="password"
                       value={user.password}
                       onChange={handleChangeInput}
                       autoComplete="current-password"
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              aria-label={
+                                showPassword ? "Hide password" : "Show password"
+                              }
+                              onClick={() => setShowPassword(prev => !prev)}
+                              edge="end"
+                              size="small"
+                              tabIndex={-1}
+                            >
+                              {showPassword ? (
+                                <VisibilityOffIcon fontSize="small" />
+                              ) : (
+                                <VisibilityIcon fontSize="small" />
+                              )}
+                            </IconButton>
+                          </InputAdornment>
+                        )
+                      }}
                     />
                     <Button
+                      className={classes.submitBtn}
                       type="submit"
                       fullWidth
                       variant="contained"
                       color="primary"
-                      className={classes.submit}
+                      disabled={isSubmitting}
                     >
-                      {i18n.t("login.buttons.submit")}
+                      {isSubmitting ? (
+                        <CircularProgress size={22} color="inherit" />
+                      ) : (
+                        i18n.t("login.buttons.submit")
+                      )}
                     </Button>
                     {allowSignup && (
-                      <Grid container>
+                      <Grid container className={classes.signupRow}>
                         <Grid item>
                           <Link
                             href="#"
